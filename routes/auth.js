@@ -7,6 +7,7 @@ const fs = require('fs');
 const User = require('../models/User');
 const Seller = require('../models/Seller');
 const Admin = require('../models/Admin');
+const { getLocationFromIP } = require('../utils/geolocation');
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads/logos');
@@ -153,11 +154,45 @@ router.post('/register/seller', upload.single('storeLogo'), async (req, res) => 
   }
 });
 
-// @route   POST /api/auth/register/admin
+// @desc    Register a new admin
+// @access  Public (Should be protected in production!)
 router.post('/register/admin', async (req, res) => {
   try {
-    const { email, password, phone, country, accountType } = req.body;
+    const { email, password, confirmPassword, fullName } = req.body;
 
+    // Validate required fields
+    if (!email || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and password'
+      });
+    }
+
+    // Check if passwords match
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match'
+      });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long'
+      });
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain uppercase, lowercase, number, and special character'
+      });
+    }
+
+    // Check if admin exists
     const existingAdmin = await Admin.findOne({ email });
     if (existingAdmin) {
       return res.status(400).json({
@@ -166,14 +201,17 @@ router.post('/register/admin', async (req, res) => {
       });
     }
 
+    // Create admin (using default values for fields not in form)
     const admin = await Admin.create({
       email,
       password,
-      phone,
-      country,
-      accountType
+      fullName: fullName || '',
+      phone: 'N/A',
+      country: 'N/A',
+      accountType: 'Admin'
     });
 
+    // Generate token
     const token = generateToken(admin._id, admin.role);
 
     res.status(201).json({
@@ -183,16 +221,19 @@ router.post('/register/admin', async (req, res) => {
       admin: {
         id: admin._id,
         email: admin.email,
+        fullName: admin.fullName,
         role: admin.role
       }
     });
   } catch (error) {
+    console.error('Admin registration error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Registration failed'
     });
   }
 });
+
 
 // @route   POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -206,10 +247,37 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Get user's IP address
+    const userIP = req.headers['x-forwarded-for'] || 
+                   req.connection.remoteAddress || 
+                   req.socket.remoteAddress;
+
+    // Check in User collection
     let account = await User.findOne({ email }).select('+password');
     let role = 'user';
     let dashboardUrl = '/userpage';
+    let location = null;
+    let currency = 'USD';
 
+    // If user account found, detect location and currency
+    if (account && role === 'user') {
+      location = getLocationFromIP(userIP);
+      currency = location.currency;
+      
+      // Update user's location and currency
+      await User.findByIdAndUpdate(account._id, {
+        location: {
+          country: location.country,
+          city: location.city,
+          region: location.region,
+          timezone: location.timezone
+        },
+        currency: currency,
+        lastIP: userIP
+      });
+    }
+
+    // If not found, check Seller collection
     if (!account) {
       account = await Seller.findOne({ email }).select('+password');
       if (account) {
@@ -219,12 +287,13 @@ router.post('/login', async (req, res) => {
         if (!account.isApproved) {
           return res.status(403).json({
             success: false,
-            message: 'Your seller account is pending approval'
+            message: 'Your seller account is pending approval. Please wait for admin verification.'
           });
         }
       }
     }
 
+    // If still not found, check Admin collection
     if (!account) {
       account = await Admin.findOne({ email }).select('+password');
       if (account) {
@@ -233,6 +302,7 @@ router.post('/login', async (req, res) => {
       }
     }
 
+    // If account not found in any collection
     if (!account) {
       return res.status(401).json({
         success: false,
@@ -240,13 +310,15 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Check if account is active
     if (!account.isActive) {
       return res.status(403).json({
         success: false,
-        message: 'Your account has been deactivated'
+        message: 'Your account has been deactivated. Please contact support.'
       });
     }
 
+    // Verify password
     const isPasswordValid = await account.comparePassword(password);
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -255,6 +327,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Generate token
     const token = generateToken(account._id, role);
 
     res.status(200).json({
@@ -267,13 +340,16 @@ router.post('/login', async (req, res) => {
         id: account._id,
         email: account.email,
         role: role,
-        name: account.fullName || account.storeName || 'Admin'
+        name: account.fullName || account.storeName || 'Admin',
+        currency: currency, // Send currency to frontend
+        location: location // Send location to frontend
       }
     });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Login failed. Please try again.'
     });
   }
 });

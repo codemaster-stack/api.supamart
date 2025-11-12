@@ -28,6 +28,21 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Phone number is required']
   },
+
+   location: {
+    country: String,
+    city: String,
+    region: String,
+    timezone: String
+  },
+  currency: {
+    type: String,
+    default: 'USD'
+  },
+  lastIP: {
+    type: String
+  },
+  
   role: {
     type: String,
     default: 'user',
