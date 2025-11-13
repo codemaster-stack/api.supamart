@@ -90,14 +90,38 @@ router.post('/register/user', async (req, res) => {
 });
 
 // @route   POST /api/auth/register/seller
+// @route   POST /api/auth/register/seller
+// @desc    Register a new seller (with Cloudinary upload)
+// @access  Public
 router.post('/register/seller', upload.single('storeLogo'), async (req, res) => {
   try {
     const {
-      email, password, storeName, storeURL, storeDescription,
-      fullName, country, phoneNumber,
-      addressLine1, addressLine2, city, stateProvince, postalCode
+      email, 
+      password, 
+      storeName, 
+      storeURL, 
+      storeDescription,
+      fullName, 
+      country, 
+      phoneNumber,
+      addressLine1, 
+      addressLine2, 
+      city, 
+      stateProvince, 
+      postalCode
     } = req.body;
 
+    // Validate required fields
+    if (!email || !password || !storeName || !storeDescription || 
+        !fullName || !country || !phoneNumber || !addressLine1 || 
+        !city || !stateProvince || !postalCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields'
+      });
+    }
+
+    // Check if seller exists
     const existingSeller = await Seller.findOne({ email });
     if (existingSeller) {
       return res.status(400).json({
@@ -106,6 +130,7 @@ router.post('/register/seller', upload.single('storeLogo'), async (req, res) => 
       });
     }
 
+    // Check if file was uploaded
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -113,25 +138,38 @@ router.post('/register/seller', upload.single('storeLogo'), async (req, res) => 
       });
     }
 
+    // Generate shopURL from storeURL or storeName
+    let shopURL = storeURL || storeName.toLowerCase().replace(/\s+/g, '-');
+    
+    // Make sure shopURL is unique
+    let existingShop = await Seller.findOne({ shopURL });
+    if (existingShop) {
+      // Add random number if shopURL already exists
+      shopURL = `${shopURL}-${Math.floor(Math.random() * 10000)}`;
+    }
+
+    // Create seller with Cloudinary URL
     const seller = await Seller.create({
       email,
       password,
       storeName,
-      storeURL,
-      storeLogo: `/uploads/logos/${req.file.filename}`,
+      storeURL: storeURL || '', // Original storeURL input
+      shopURL: shopURL, // ← IMPORTANT: This is the unique shop identifier
+      storeLogo: req.file.path, // Cloudinary URL
       storeDescription,
       fullName,
       country,
       phoneNumber,
       address: {
         line1: addressLine1,
-        line2: addressLine2,
+        line2: addressLine2 || '',
         city,
         stateProvince,
         postalCode
       }
     });
 
+    // Generate token
     const token = generateToken(seller._id, seller.role);
 
     res.status(201).json({
@@ -143,13 +181,16 @@ router.post('/register/seller', upload.single('storeLogo'), async (req, res) => 
         storeName: seller.storeName,
         email: seller.email,
         role: seller.role,
-        isApproved: seller.isApproved
+        isApproved: seller.isApproved,
+        storeLogo: seller.storeLogo,
+        shopURL: seller.shopURL // ← Send this to frontend
       }
     });
   } catch (error) {
+    console.error('Seller registration error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Registration failed'
     });
   }
 });

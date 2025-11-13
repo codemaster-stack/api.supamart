@@ -20,8 +20,51 @@ const sellerSchema = new mongoose.Schema({
     required: [true, 'Store name is required'],
     trim: true
   },
-  storeURL: {
+
+   wallets: {
+    USD: {
+      balance: { type: Number, default: 0 },
+      pendingBalance: { type: Number, default: 0 }, // Money in escrow
+      totalEarnings: { type: Number, default: 0 }
+    },
+    GBP: {
+      balance: { type: Number, default: 0 },
+      pendingBalance: { type: Number, default: 0 },
+      totalEarnings: { type: Number, default: 0 }
+    },
+    EUR: {
+      balance: { type: Number, default: 0 },
+      pendingBalance: { type: Number, default: 0 },
+      totalEarnings: { type: Number, default: 0 }
+    },
+    NGN: {
+      balance: { type: Number, default: 0 },
+      pendingBalance: { type: Number, default: 0 },
+      totalEarnings: { type: Number, default: 0 }
+    }
+  },
+  
+  // Bank account info for withdrawals
+  bankAccounts: [{
+    currency: { type: String, enum: ['USD', 'GBP', 'EUR', 'NGN'] },
+    accountNumber: String,
+    accountName: String,
+    bankName: String,
+    swiftCode: String, // For international transfers
+    isDefault: { type: Boolean, default: false }
+  }],
+  
+  // Shop URL (unique identifier)
+   storeURL: {
     type: String,
+    trim: true
+  },
+  
+  shopURL: {
+    type: String,
+    unique: true,
+    required: true,
+    lowercase: true,
     trim: true
   },
   storeLogo: {
