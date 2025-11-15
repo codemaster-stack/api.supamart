@@ -20,46 +20,10 @@ const sellerSchema = new mongoose.Schema({
     required: [true, 'Store name is required'],
     trim: true
   },
-
-   wallets: {
-    USD: {
-      balance: { type: Number, default: 0 },
-      pendingBalance: { type: Number, default: 0 }, // Money in escrow
-      totalEarnings: { type: Number, default: 0 }
-    },
-    GBP: {
-      balance: { type: Number, default: 0 },
-      pendingBalance: { type: Number, default: 0 },
-      totalEarnings: { type: Number, default: 0 }
-    },
-    EUR: {
-      balance: { type: Number, default: 0 },
-      pendingBalance: { type: Number, default: 0 },
-      totalEarnings: { type: Number, default: 0 }
-    },
-    NGN: {
-      balance: { type: Number, default: 0 },
-      pendingBalance: { type: Number, default: 0 },
-      totalEarnings: { type: Number, default: 0 }
-    }
-  },
-  
-  // Bank account info for withdrawals
-  bankAccounts: [{
-    currency: { type: String, enum: ['USD', 'GBP', 'EUR', 'NGN'] },
-    accountNumber: String,
-    accountName: String,
-    bankName: String,
-    swiftCode: String, // For international transfers
-    isDefault: { type: Boolean, default: false }
-  }],
-  
-  // Shop URL (unique identifier)
-   storeURL: {
+  storeURL: {
     type: String,
     trim: true
   },
-  
   shopURL: {
     type: String,
     unique: true,
@@ -107,6 +71,41 @@ const sellerSchema = new mongoose.Schema({
       required: [true, 'Postal code is required']
     }
   },
+  
+  // Multi-currency wallets
+  wallets: {
+    USD: {
+      balance: { type: Number, default: 0 },
+      pendingBalance: { type: Number, default: 0 },
+      totalEarnings: { type: Number, default: 0 }
+    },
+    GBP: {
+      balance: { type: Number, default: 0 },
+      pendingBalance: { type: Number, default: 0 },
+      totalEarnings: { type: Number, default: 0 }
+    },
+    EUR: {
+      balance: { type: Number, default: 0 },
+      pendingBalance: { type: Number, default: 0 },
+      totalEarnings: { type: Number, default: 0 }
+    },
+    NGN: {
+      balance: { type: Number, default: 0 },
+      pendingBalance: { type: Number, default: 0 },
+      totalEarnings: { type: Number, default: 0 }
+    }
+  },
+  
+  // Bank account info for withdrawals
+  bankAccounts: [{
+    currency: { type: String, enum: ['USD', 'GBP', 'EUR', 'NGN'] },
+    accountNumber: String,
+    accountName: String,
+    bankName: String,
+    swiftCode: String,
+    isDefault: { type: Boolean, default: false }
+  }],
+  
   role: {
     type: String,
     default: 'seller',
@@ -126,12 +125,14 @@ const sellerSchema = new mongoose.Schema({
   }
 });
 
+// Hash password before saving
 sellerSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
+// Compare password method
 sellerSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
