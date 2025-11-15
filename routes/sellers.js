@@ -200,4 +200,117 @@ router.put('/:id', protect, authorize('seller'), async (req, res) => {
   }
 });
 
+
+// @route   POST /api/sellers/:id/bank-account
+// @desc    Add bank account
+// @access  Protected - Seller
+router.post('/:id/bank-account', protect, authorize('seller'), async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized'
+      });
+    }
+    
+    const { currency, bankName, accountName, accountNumber, swiftCode } = req.body;
+    
+    const seller = await Seller.findById(req.params.id);
+    
+    seller.bankAccounts.push({
+      currency,
+      bankName,
+      accountName,
+      accountNumber,
+      swiftCode: swiftCode || ''
+    });
+    
+    await seller.save();
+    
+    res.json({
+      success: true,
+      message: 'Bank account added successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   DELETE /api/sellers/:id/bank-account/:accountId
+// @desc    Remove bank account
+// @access  Protected - Seller
+router.delete('/:id/bank-account/:accountId', protect, authorize('seller'), async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized'
+      });
+    }
+    
+    const seller = await Seller.findById(req.params.id);
+    
+    seller.bankAccounts = seller.bankAccounts.filter(
+      account => account._id.toString() !== req.params.accountId
+    );
+    
+    await seller.save();
+    
+    res.json({
+      success: true,
+      message: 'Bank account removed'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   POST /api/sellers/:id/payout
+// @desc    Request payout
+// @access  Protected - Seller
+router.post('/:id/payout', protect, authorize('seller'), async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized'
+      });
+    }
+    
+    const { currency, amount, accountId } = req.body;
+    
+    const seller = await Seller.findById(req.params.id);
+    
+    // Check if seller has enough balance
+    if (seller.wallets[currency].balance < amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient balance'
+      });
+    }
+    
+    // Deduct from balance (in production, create payout request record)
+    seller.wallets[currency].balance -= amount;
+    await seller.save();
+    
+    // In production, you'd create a Payout model and send to payment processor
+    
+    res.json({
+      success: true,
+      message: 'Payout request submitted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
