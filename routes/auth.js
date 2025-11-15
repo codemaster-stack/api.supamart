@@ -277,6 +277,7 @@ router.post('/register/admin', async (req, res) => {
 
 
 // @route   POST /api/auth/login
+// @route   POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -339,7 +340,8 @@ router.post('/login', async (req, res) => {
       account = await Admin.findOne({ email }).select('+password');
       if (account) {
         role = 'admin';
-        dashboardUrl = '/admin-dashboard';
+        dashboardUrl = '/admin-dashboard.html'; // CRITICAL: Add .html
+        console.log('✅ Admin login detected');
       }
     }
 
@@ -370,20 +372,26 @@ router.post('/login', async (req, res) => {
 
     // Generate token
     const token = generateToken(account._id, role);
+    
+    console.log('✅ Login successful:', {
+      email: account.email,
+      role: role,
+      dashboardUrl: dashboardUrl
+    });
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
       token,
-      role,
+      role, // CRITICAL: Make sure role is sent
       dashboardUrl,
       user: {
         id: account._id,
         email: account.email,
-        role: role,
+        role: role, // CRITICAL: Include role in user object too
         name: account.fullName || account.storeName || 'Admin',
-        currency: currency, // Send currency to frontend
-        location: location // Send location to frontend
+        currency: currency,
+        location: location
       }
     });
   } catch (error) {
