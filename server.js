@@ -16,7 +16,7 @@ const app = express();
 connectDB();
 
 // CORS configuration
-// ✅ UPDATED CORS configuration - Allow multiple origins
+// ✅ UPDATED CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5500',
@@ -27,21 +27,32 @@ const allowedOrigins = [
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
+// ✅ MORE PERMISSIVE CORS CONFIGURATION
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
     if (!origin) return callback(null, true);
     
+    // Check if origin is allowed
     if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('✅ CORS allowed origin:', origin);
       callback(null, true);
     } else {
       console.log('❌ CORS blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
+      console.log('Allowed origins:', allowedOrigins);
+      // ✅ STILL ALLOW but log warning (for debugging)
+      callback(null, true); // Change this to callback(new Error('Not allowed by CORS')) in production
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400 // ✅ Cache preflight for 24 hours
 }));
+
+// ✅ Handle preflight requests explicitly
+// app.options('*', cors());
 
 
 
