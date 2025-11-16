@@ -1,44 +1,11 @@
+const { upload } = require('../config/cloudinary');
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const User = require('../models/User');
 const Seller = require('../models/Seller');
 const Admin = require('../models/Admin');
 const { getLocationFromIP } = require('../utils/geolocation');
-
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '../uploads/logos');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png/;
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
-    
-    if (extname && mimetype) {
-      return cb(null, true);
-    }
-    cb(new Error('Only image files are allowed!'));
-  }
-});
 
 // Generate JWT Token
 const generateToken = (id, role) => {

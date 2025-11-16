@@ -1,3 +1,4 @@
+const { upload } = require('../config/cloudinary');
 const express = require('express');
 const router = express.Router();
 const Seller = require('../models/Seller');
@@ -309,6 +310,54 @@ router.post('/:id/payout', protect, authorize('seller'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message
+    });
+  }
+});
+
+
+// @route   PUT /api/sellers/:id/logo
+// @desc    Update seller store logo
+// @access  Protected - Seller
+router.put('/:id/logo', protect, authorize('seller'), upload.single('storeLogo'), async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized'
+      });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload a logo file'
+      });
+    }
+    
+    const seller = await Seller.findByIdAndUpdate(
+      req.params.id,
+      { storeLogo: req.file.path },
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        message: 'Seller not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Logo updated successfully',
+      storeLogo: seller.storeLogo
+    });
+    
+  } catch (error) {
+    console.error('Logo update error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update logo'
     });
   }
 });
