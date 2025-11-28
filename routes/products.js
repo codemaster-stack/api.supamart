@@ -4,8 +4,7 @@ const router = express.Router();
 const Product = require('../models/Product');
 const Seller = require('../models/Seller');
 const { protect, authorize } = require('../middleware/auth');
-const multer = require('multer');
-const upload = multer();
+const { upload } = require('../config/cloudinary');
 
 // @route   POST /api/products/convert-price
 // @desc    Convert product price to user's currency
