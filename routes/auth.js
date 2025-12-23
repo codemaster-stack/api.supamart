@@ -6,6 +6,9 @@ const User = require('../models/User');
 const Seller = require('../models/Seller');
 const Admin = require('../models/Admin');
 const { getLocationFromIP } = require('../utils/geolocation');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+const bcrypt = require('bcryptjs');
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -56,7 +59,7 @@ router.post('/register/user', async (req, res) => {
   }
 });
 
-// @route   POST /api/auth/register/seller
+
 // @route   POST /api/auth/register/seller
 // @desc    Register a new seller (with Cloudinary upload)
 // @access  Public
@@ -243,7 +246,7 @@ router.post('/register/admin', async (req, res) => {
 });
 
 
-// @route   POST /api/auth/login
+
 // @route   POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
@@ -369,5 +372,92 @@ router.post('/login', async (req, res) => {
     });
   }
 });
+
+
+
+// @route   POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
+
+    // Search across all collections
+    let user = await User.findOne({ email }) || 
+               await Seller.findOne({ email }) ||
+               await Admin.findOne({ email });
+
+    if (!user) {
+      // Security: don’t reveal if email exists
+      return res.status(200).json({ success: true, message: 'If this email exists, a reset link has been sent' });
+    }
+
+    // Generate secure token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiry = Date.now() + 3600000; // 1 hour
+
+    user.resetToken = token;
+    user.resetTokenExpiry = expiry;
+    await user.save();
+
+    // Send email via Zoho SMTP
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.zoho.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.ZOHO_EMAIL,
+        pass: process.env.ZOHO_APP_PASSWORD
+      }
+    });
+
+    const resetLink = `https://supamart.vercel.app/reset-password.html?token=${token}`;
+
+    await transporter.sendMail({
+      from: `"Suppermart" <${process.env.ZOHO_EMAIL}>`,
+      to: email,
+      subject: 'Password Reset',
+      html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
+    });
+
+    res.status(200).json({ success: true, message: 'If this email exists, a reset link has been sent' });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ success: false, message: 'Something went wrong' });
+  }
+});
+
+
+
+
+// @route   POST /api/auth/reset-password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ success: false, message: 'Token and password required' });
+
+    // Find user by token and check expiry
+    let user = await User.findOne({ resetToken: token, resetTokenExpiry: { $gt: Date.now() } }) ||
+               await Seller.findOne({ resetToken: token, resetTokenExpiry: { $gt: Date.now() } }) ||
+               await Admin.findOne({ resetToken: token, resetTokenExpiry: { $gt: Date.now() } });
+
+    if (!user) return res.status(400).json({ success: false, message: 'Invalid or expired token' });
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+
+    // Clear token
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+
+    await user.save();
+
+    res.status(200).json({ success: true, message: 'Password has been reset successfully' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ success: false, message: 'Something went wrong' });
+  }
+});
+
 
 module.exports = router;
