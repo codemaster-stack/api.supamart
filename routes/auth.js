@@ -410,7 +410,7 @@ router.post('/forgot-password', async (req, res) => {
       }
     });
 
-    const resetLink = `https://supamart.vercel.app/reset-password.html?token=${token}`;
+    const resetLink = `https://supamart.shop/reset-password.html?token=${token}`;
 
     await transporter.sendMail({
       from: `"Suppermart" <${process.env.ZOHO_EMAIL}>`,
