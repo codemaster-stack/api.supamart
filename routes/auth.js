@@ -9,6 +9,8 @@ const { getLocationFromIP } = require('../utils/geolocation');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
+const axios = require('axios');
+
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -375,53 +377,34 @@ router.post('/login', async (req, res) => {
 
 
 
-// @route   POST /api/auth/forgot-password
+// @route POST /api/auth/forgot-password
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: 'Email required' });
 
-    // Search across all collections
-    let user = await User.findOne({ email }) || 
+    // Find user in any collection
+    let user = await User.findOne({ email }) ||
                await Seller.findOne({ email }) ||
                await Admin.findOne({ email });
 
     if (!user) {
-      // Security: don’t reveal if email exists
+      // Always return success message to avoid revealing accounts
       return res.status(200).json({ success: true, message: 'If this email exists, a reset link has been sent' });
     }
 
     // Generate secure token
     const token = crypto.randomBytes(32).toString('hex');
     const expiry = Date.now() + 3600000; // 1 hour
-
     user.resetToken = token;
     user.resetTokenExpiry = expiry;
     await user.save();
 
-    // Send email via Zoho SMTP
-    const transporter = nodemailer.createTransport({
-  host: 'smtp.zoho.com',
-  port: 587,
-  secure: false, // TLS
-  auth: {
-    user: process.env.ZOHO_EMAIL,
-    pass: process.env.ZOHO_APP_PASSWORD
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
+    // Generate reset link
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password.html?token=${token}`;
 
-
-    const resetLink = `https://supamart.shop/reset-password.html?token=${token}`;
-
-    await transporter.sendMail({
-      from: `"Suppermart" <${process.env.ZOHO_EMAIL}>`,
-      to: email,
-      subject: 'Password Reset',
-      html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
-    });
+    // Send email via Zoho
+    await sendResetEmail(email, resetLink);
 
     res.status(200).json({ success: true, message: 'If this email exists, a reset link has been sent' });
   } catch (err) {
@@ -431,15 +414,52 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 
+async function sendResetEmail(toEmail, resetLink) {
+  try {
+    // 1. Get access token from refresh token
+    const tokenResponse = await axios.post('https://accounts.zoho.com/oauth/v2/token', null, {
+      params: {
+        refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+        client_id: process.env.ZOHO_CLIENT_ID,
+        client_secret: process.env.ZOHO_CLIENT_SECRET,
+        grant_type: 'refresh_token'
+      }
+    });
+
+    const accessToken = tokenResponse.data.access_token;
+
+    // 2. Send email using Zoho Mail API
+    await axios.post(
+      'https://www.zohoapis.com/mail/v1/messages',
+      {
+        fromAddress: process.env.ZOHO_EMAIL,
+        toAddress: toEmail,
+        subject: 'Suppermart Password Reset',
+        content: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
+      },
+      {
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log(`✅ Reset email sent to ${toEmail}`);
+  } catch (err) {
+    console.error('Error sending email via Zoho API:', err.response?.data || err.message);
+    // Optional: Do not throw to user to prevent revealing email existence
+  }
+}
 
 
-// @route   POST /api/auth/reset-password
+// @route POST /api/auth/reset-password
 router.post('/reset-password', async (req, res) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ success: false, message: 'Token and password required' });
 
-    // Find user by token and check expiry
+    // Find user by token & expiry
     let user = await User.findOne({ resetToken: token, resetTokenExpiry: { $gt: Date.now() } }) ||
                await Seller.findOne({ resetToken: token, resetTokenExpiry: { $gt: Date.now() } }) ||
                await Admin.findOne({ resetToken: token, resetTokenExpiry: { $gt: Date.now() } });
@@ -462,6 +482,5 @@ router.post('/reset-password', async (req, res) => {
     res.status(500).json({ success: false, message: 'Something went wrong' });
   }
 });
-
 
 module.exports = router;
