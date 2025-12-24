@@ -417,33 +417,44 @@ router.post('/forgot-password', async (req, res) => {
 async function sendResetEmail(toEmail, resetLink) {
   try {
     // 1. Get access token from refresh token
-    const tokenResponse = await axios.post('https://accounts.zoho.com/oauth/v2/token', null, {
-      params: {
-        refresh_token: process.env.ZOHO_REFRESH_TOKEN,
-        client_id: process.env.ZOHO_CLIENT_ID,
-        client_secret: process.env.ZOHO_CLIENT_SECRET,
-        grant_type: 'refresh_token'
-      }
-    });
+    const qs = require('querystring');
+
+const tokenResponse = await axios.post(
+  'https://accounts.zoho.com/oauth/v2/token',
+  qs.stringify({
+    refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+    client_id: process.env.ZOHO_CLIENT_ID,
+    client_secret: process.env.ZOHO_CLIENT_SECRET,
+    grant_type: 'refresh_token'
+  }),
+  {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  }
+);
+
 
     const accessToken = tokenResponse.data.access_token;
 
     // 2. Send email using Zoho Mail API
+    
     await axios.post(
-      'https://www.zohoapis.com/mail/v1/messages',
-      {
-        fromAddress: process.env.ZOHO_EMAIL,
-        toAddress: toEmail,
-        subject: 'Suppermart Password Reset',
-        content: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
-      },
-      {
-        headers: {
-          Authorization: `Zoho-oauthtoken ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+  'https://www.zohoapis.com/mail/v1/messages',
+  {
+    message: {
+      fromAddress: process.env.ZOHO_EMAIL,
+      toAddress: toEmail,
+      subject: 'Suppermart Password Reset',
+      content: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
+    }
+  },
+  {
+    headers: {
+      Authorization: `Zoho-oauthtoken ${accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  }
+);
+
 
     console.log(`✅ Reset email sent to ${toEmail}`);
   } catch (err) {
