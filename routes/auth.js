@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const axios = require('axios');
+const qs = require('querystring');
 
 
 // Generate JWT Token
@@ -416,49 +417,53 @@ router.post('/forgot-password', async (req, res) => {
 
 async function sendResetEmail(toEmail, resetLink) {
   try {
-    // 1. Get access token from refresh token
     const qs = require('querystring');
 
-const tokenResponse = await axios.post(
-  'https://accounts.zoho.com/oauth/v2/token',
-  qs.stringify({
-    refresh_token: process.env.ZOHO_REFRESH_TOKEN,
-    client_id: process.env.ZOHO_CLIENT_ID,
-    client_secret: process.env.ZOHO_CLIENT_SECRET,
-    grant_type: 'refresh_token'
-  }),
-  {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-  }
-);
-
+    // 1️⃣ Get OAuth access token from refresh token
+    const tokenResponse = await axios.post(
+      'https://accounts.zoho.com/oauth/v2/token',
+      qs.stringify({
+        refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+        client_id: process.env.ZOHO_CLIENT_ID,
+        client_secret: process.env.ZOHO_CLIENT_SECRET,
+        grant_type: 'refresh_token'
+      }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
 
     const accessToken = tokenResponse.data.access_token;
 
-    // 2. Send email using Zoho Mail API
-    
-await axios.post(
-  `https://mail.zoho.com/api/accounts/${process.env.ZOHO_ACCOUNT_ID}/messages`,
-  {
-    fromAddress: process.env.ZOHO_EMAIL,
-    toAddress: toEmail,
-    subject: 'Suppermart Password Reset',
-    content: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
-  },
-  {
-    headers: {
-      Authorization: `Zoho-oauthtoken ${accessToken}`,
-      'Content-Type': 'application/json'
+    // 2️⃣ Get your Zoho Mail account ID
+    const accountsResp = await axios.get('https://mail.zoho.com/api/accounts', {
+      headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+    });
+
+    if (!accountsResp.data?.data?.length) {
+      throw new Error('No Zoho Mail account found for this token.');
     }
-  }
-);
 
+    const accountId = accountsResp.data.data[0].accountId; // take the first account
 
+    // 3️⃣ Send email
+    await axios.post(
+      `https://mail.zoho.com/api/accounts/${accountId}/messages`,
+      {
+        fromAddress: process.env.ZOHO_EMAIL,
+        toAddress: toEmail,
+        subject: 'Supamart Password Reset',
+        content: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
+      },
+      {
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
 
     console.log(`✅ Reset email sent to ${toEmail}`);
   } catch (err) {
     console.error('Error sending email via Zoho API:', err.response?.data || err.message);
-    // Optional: Do not throw to user to prevent revealing email existence
   }
 }
 
