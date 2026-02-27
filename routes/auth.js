@@ -419,7 +419,7 @@ async function sendResetEmail(toEmail, resetLink) {
   try {
     const qs = require('querystring');
 
-    // 1️⃣ Get OAuth access token from refresh token
+    // 1️⃣ Get access token
     const tokenResponse = await axios.post(
       'https://accounts.zoho.com/oauth/v2/token',
       qs.stringify({
@@ -433,24 +433,13 @@ async function sendResetEmail(toEmail, resetLink) {
 
     const accessToken = tokenResponse.data.access_token;
 
-    // 2️⃣ Get your Zoho Mail account ID
-    const accountsResp = await axios.get('https://mail.zoho.com/api/accounts', {
-      headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
-    });
-
-    if (!accountsResp.data?.data?.length) {
-      throw new Error('No Zoho Mail account found for this token.');
-    }
-
-    const accountId = accountsResp.data.data[0].accountId; // take the first account
-
-    // 3️⃣ Send email
+    // 2️⃣ Send email
     await axios.post(
-      `https://mail.zoho.com/api/accounts/${accountId}/messages`,
+      'https://mail.zoho.com/api/accounts/messages',
       {
         fromAddress: process.env.ZOHO_EMAIL,
         toAddress: toEmail,
-        subject: 'Supamart Password Reset',
+        subject: 'Suppermart Password Reset',
         content: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
       },
       {
