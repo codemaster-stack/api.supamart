@@ -437,15 +437,13 @@ const tokenResponse = await axios.post(
 
     // 2. Send email using Zoho Mail API
     
-    await axios.post(
-  'https://www.zohoapis.com/mail/v1/messages',
+await axios.post(
+  `https://mail.zoho.com/api/accounts/${process.env.ZOHO_ACCOUNT_ID}/messages`,
   {
-    message: {
-      fromAddress: process.env.ZOHO_EMAIL,
-      toAddress: toEmail,
-      subject: 'Suppermart Password Reset',
-      content: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
-    }
+    fromAddress: process.env.ZOHO_EMAIL,
+    toAddress: toEmail,
+    subject: 'Suppermart Password Reset',
+    content: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
   },
   {
     headers: {
@@ -454,6 +452,7 @@ const tokenResponse = await axios.post(
     }
   }
 );
+
 
 
     console.log(`✅ Reset email sent to ${toEmail}`);
