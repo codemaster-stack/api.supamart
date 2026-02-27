@@ -435,7 +435,7 @@ async function sendResetEmail(toEmail, resetLink) {
 
     // 2️⃣ Send email
     await axios.post(
-      'https://mail.zoho.com/api/accounts/messages',
+      `https://mail.zoho.com/api/accounts/${process.env.ZOHO_ACCOUNT_ID}/messages`,
       {
         fromAddress: process.env.ZOHO_EMAIL,
         toAddress: toEmail,
@@ -484,6 +484,31 @@ router.post('/reset-password', async (req, res) => {
   } catch (err) {
     console.error('Reset password error:', err);
     res.status(500).json({ success: false, message: 'Something went wrong' });
+  }
+});
+
+router.get('/zoho-debug', async (req, res) => {
+  try {
+    const tokenRes = await axios.post(
+      'https://accounts.zoho.com/oauth/v2/token',
+      qs.stringify({
+        refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+        client_id: process.env.ZOHO_CLIENT_ID,
+        client_secret: process.env.ZOHO_CLIENT_SECRET,
+        grant_type: 'refresh_token'
+      }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const accessToken = tokenRes.data.access_token;
+
+    const accounts = await axios.get('https://mail.zoho.com/api/accounts', {
+      headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
+    });
+
+    res.json(accounts.data);
+  } catch (err) {
+    res.json({ error: err.response?.data || err.message });
   }
 });
 
