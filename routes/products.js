@@ -164,6 +164,14 @@ router.post('/', protect, authorize('seller'), upload.array('images'), async (re
       tags
     } = req.body;
     
+    // Block phone numbers, emails, and links in description
+    const forbiddenPattern = /(\+?\d[\d\s\-]{7,}|\b[\w.-]+@[\w.-]+\.\w{2,}\b|https?:\/\/\S+|www\.\S+)/i;
+    if (forbiddenPattern.test(description)) {
+    return res.status(400).json({
+    success: false,
+    message: 'Product description cannot contain phone numbers, email addresses, or links.'
+  });
+}
     // Upload images to Cloudinary
     const images = req.files.map(file => ({
       url: file.path,
