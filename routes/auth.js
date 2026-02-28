@@ -397,12 +397,12 @@ router.post('/forgot-password', async (req, res) => {
     // Generate secure token
     const token = crypto.randomBytes(32).toString('hex');
    const updateResult = await user.constructor.findByIdAndUpdate(user._id, {
-   $set: {
+  $set: {
     resetToken: token,
     resetTokenExpiry: new Date(Date.now() + 3600000)
-   }
-   }, { new: true });
-   console.log('resetToken in DB:', updateResult.resetToken);
+  }
+}, { new: true, strict: false });
+console.log('resetToken in DB:', updateResult.resetToken);
     // Generate reset link
     const resetLink = `${process.env.FRONTEND_URL}/reset-password.html?token=${token}`;
 
