@@ -211,5 +211,32 @@ router.post('/', protect, authorize('seller'), upload.array('images'), async (re
   }
 });
 
+// @route   GET /api/products/:id
+// @desc    Get single product by ID
+// @access  Public
+router.get('/:id', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id)
+      .populate('sellerId', 'storeName storeLogo shopURL storeDescription');
+
+    if (!product || !product.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      product
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // IMPORTANT: Add module.exports at the end
 module.exports = router;
