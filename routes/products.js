@@ -192,8 +192,8 @@ router.post('/', protect, authorize('seller'), upload.array('images'), async (re
       stock,
       condition,
       shipping: {
-        weight: shippingWeight,
-        shippingFee: JSON.parse(shippingFee)
+      weight: shippingWeight,
+      shippingFee: shippingFee ? JSON.parse(shippingFee) : {}
       },
       tags: tags ? tags.split(',').map(tag => tag.trim()) : []
     });
