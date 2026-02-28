@@ -396,11 +396,13 @@ router.post('/forgot-password', async (req, res) => {
 
     // Generate secure token
     const token = crypto.randomBytes(32).toString('hex');
-    const updateResult = await user.constructor.findByIdAndUpdate(user._id, {
+   const updateResult = await user.constructor.findByIdAndUpdate(user._id, {
+   $set: {
     resetToken: token,
     resetTokenExpiry: new Date(Date.now() + 3600000)
-    }, { new: true });
-    console.log('resetToken in DB:', updateResult.resetToken);
+   }
+   }, { new: true });
+   console.log('resetToken in DB:', updateResult.resetToken);
     // Generate reset link
     const resetLink = `${process.env.FRONTEND_URL}/reset-password.html?token=${token}`;
 
@@ -408,7 +410,7 @@ router.post('/forgot-password', async (req, res) => {
     await sendResetEmail(email, resetLink);
 
     res.status(200).json({ success: true, message: 'If this email exists, a reset link has been sent' });
-  } catch (err) {
+   } catch (err) {
     console.error('Forgot password error:', err);
     res.status(500).json({ success: false, message: 'Something went wrong' });
   }
