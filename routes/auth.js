@@ -468,22 +468,27 @@ router.post('/reset-password', async (req, res) => {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ success: false, message: 'Token and password required' });
 
-    // Find user by token & expiry
-    let user = await User.findOne({ resetToken: token, resetTokenExpiry: { $gt: Date.now() } }) ||
-               await Seller.findOne({ resetToken: token, resetTokenExpiry: { $gt: Date.now() } }) ||
-               await Admin.findOne({ resetToken: token, resetTokenExpiry: { $gt: Date.now() } });
+    const now = new Date();
 
-    if (!user) return res.status(400).json({ success: false, message: 'Invalid or expired token' });
+    // Find using native MongoDB driver
+    let sellerDoc = await mongoose.connection.collection('sellers').findOne({ resetToken: token, resetTokenExpiry: { $gt: now } });
+    let userDoc = await mongoose.connection.collection('users').findOne({ resetToken: token, resetTokenExpiry: { $gt: now } });
+    let adminDoc = await mongoose.connection.collection('admins').findOne({ resetToken: token, resetTokenExpiry: { $gt: now } });
+
+    let collection = sellerDoc ? 'sellers' : userDoc ? 'users' : adminDoc ? 'admins' : null;
+    let doc = sellerDoc || userDoc || adminDoc;
+
+    if (!doc) return res.status(400).json({ success: false, message: 'Invalid or expired token' });
 
     // Hash new password
     const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Clear token
-    user.resetToken = undefined;
-    user.resetTokenExpiry = undefined;
-
-    await user.save();
+    // Update password and clear token
+    await mongoose.connection.collection(collection).updateOne(
+      { _id: doc._id },
+      { $set: { password: hashedPassword }, $unset: { resetToken: '', resetTokenExpiry: '' } }
+    );
 
     res.status(200).json({ success: true, message: 'Password has been reset successfully' });
   } catch (err) {
@@ -491,7 +496,6 @@ router.post('/reset-password', async (req, res) => {
     res.status(500).json({ success: false, message: 'Something went wrong' });
   }
 });
-
 
 
 router.get('/debug-token/:token', async (req, res) => {
