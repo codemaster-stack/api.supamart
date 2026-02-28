@@ -149,7 +149,7 @@ router.get('/seller/:shopURL', async (req, res) => {
 // @route   POST /api/products
 // @desc    Create a new product (sellers only)
 // @access  Protected - Seller
-router.post('/', protect, authorize('seller'), async (req, res) => {
+router.post('/', protect, authorize('seller'), upload.array('images'), async (req, res) => {
   try {
     const {
       name, 
