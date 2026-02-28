@@ -399,11 +399,8 @@ router.post('/forgot-password', async (req, res) => {
     const updateResult = await user.constructor.findByIdAndUpdate(user._id, {
     resetToken: token,
     resetTokenExpiry: new Date(Date.now() + 3600000)
-    });
-    console.log('Token save result:', JSON.stringify(updateResult));
-    console.log('Token being saved:', token);
-    console.log('User ID:', user._id);
-
+    }, { new: true });
+    console.log('resetToken in DB:', updateResult.resetToken);
     // Generate reset link
     const resetLink = `${process.env.FRONTEND_URL}/reset-password.html?token=${token}`;
 
