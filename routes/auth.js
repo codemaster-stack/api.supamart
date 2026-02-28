@@ -396,10 +396,10 @@ router.post('/forgot-password', async (req, res) => {
 
     // Generate secure token
     const token = crypto.randomBytes(32).toString('hex');
-    const expiry = Date.now() + 3600000; // 1 hour
-    user.resetToken = token;
-    user.resetTokenExpiry = expiry;
-    await user.save();
+    await user.constructor.findByIdAndUpdate(user._id, {
+    resetToken: token,
+    resetTokenExpiry: new Date(Date.now() + 3600000)
+    });
 
     // Generate reset link
     const resetLink = `${process.env.FRONTEND_URL}/reset-password.html?token=${token}`;
