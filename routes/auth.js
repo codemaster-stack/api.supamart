@@ -490,4 +490,18 @@ router.post('/reset-password', async (req, res) => {
 
 
 
+router.get('/debug-token/:token', async (req, res) => {
+  const { token } = req.params;
+  const user = await User.findOne({ resetToken: token }) ||
+               await Seller.findOne({ resetToken: token }) ||
+               await Admin.findOne({ resetToken: token });
+  
+  res.json({
+    found: !!user,
+    expired: user ? user.resetTokenExpiry < Date.now() : null,
+    expiry: user ? user.resetTokenExpiry : null,
+    now: new Date()
+  });
+});
+
 module.exports = router;
