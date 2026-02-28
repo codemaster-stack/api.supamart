@@ -9,7 +9,8 @@ const { getLocationFromIP } = require('../utils/geolocation');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
-
+const axios = require('axios');
+const qs = require('querystring');
 
 
 // Generate JWT Token
@@ -416,26 +417,45 @@ router.post('/forgot-password', async (req, res) => {
 
 async function sendResetEmail(toEmail, resetLink) {
   try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.zoho.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.ZOHO_EMAIL,
-        pass: process.env.ZOHO_APP_PASSWORD
-      }
+    const tokenResponse = await axios.post(
+      'https://accounts.zoho.com/oauth/v2/token',
+      qs.stringify({
+        refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+        client_id: process.env.ZOHO_CLIENT_ID,
+        client_secret: process.env.ZOHO_CLIENT_SECRET,
+        grant_type: 'refresh_token'
+      }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const accessToken = tokenResponse.data.access_token;
+
+    // Get account ID first
+    const accountsRes = await axios.get('https://mail.zoho.com/api/accounts', {
+      headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
     });
 
-    await transporter.sendMail({
-      from: `"Supamart" <${process.env.ZOHO_EMAIL}>`,
-      to: toEmail,
-      subject: 'Supamart Password Reset',
-      html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
-    });
+    const accountId = accountsRes.data.data[0].accountId;
+
+    await axios.post(
+      `https://mail.zoho.com/api/accounts/${accountId}/messages`,
+      {
+        fromAddress: process.env.ZOHO_EMAIL,
+        toAddress: toEmail,
+        subject: 'Supamart Password Reset',
+        content: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
+      },
+      {
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
 
     console.log(`✅ Reset email sent to ${toEmail}`);
   } catch (err) {
-    console.error('Error sending email:', err.message);
+    console.error('Error sending email via Zoho API:', err.response?.data || err.message);
   }
 }
 // @route POST /api/auth/reset-password
