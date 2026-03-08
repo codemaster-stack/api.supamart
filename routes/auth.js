@@ -397,7 +397,12 @@ router.post('/forgot-password', async (req, res) => {
 
     // Generate secure token
     const token = crypto.randomBytes(32).toString('hex');
-   const updateResult = await mongoose.connection.collection('sellers').updateOne(
+ // Determine which collection the user belongs to
+let collection = 'users';
+if (user.role === 'seller') collection = 'sellers';
+if (user.role === 'admin') collection = 'admins';
+
+await mongoose.connection.collection(collection).updateOne(
   { _id: user._id },
   { $set: {
     resetToken: token,
