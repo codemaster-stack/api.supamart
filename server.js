@@ -9,6 +9,7 @@ const orderRoutes = require('./routes/orders');
 const adminRoutes = require('./routes/admin');
 const sellerRoutes = require('./routes/sellers');
 const newsletterRoutes = require('./routes/newsletter');
+const bannerRoutes = require('./routes/banners');
 
 dotenv.config();
 
@@ -70,6 +71,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/api/newsletter', newsletterRoutes);
+app.use('/api/banners', bannerRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
